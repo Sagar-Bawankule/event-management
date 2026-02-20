@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 
-const MONGODB_URI = "mongodb://localhost:27017/Event_Management";
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/Event_Management";
 
 // Define schemas inline to avoid import issues with tsx
 const UserSchema = new mongoose.Schema(
