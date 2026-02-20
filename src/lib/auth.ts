@@ -5,6 +5,7 @@ import connectDB from "@/lib/db";
 import User from "@/models/User";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  trustHost: true,
   providers: [
     Credentials({
       name: "credentials",
@@ -67,5 +68,5 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   session: {
     strategy: "jwt",
   },
-  secret: process.env.AUTH_SECRET || "MeetMatch-secret-key-change-in-production",
+  secret: process.env.AUTH_SECRET,
 });

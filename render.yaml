@@ -8,6 +8,8 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 20.11.0
+      - key: AUTH_TRUST_HOST
+        value: "true"
       - key: MONGODB_URI
         sync: false
       - key: AUTH_SECRET
