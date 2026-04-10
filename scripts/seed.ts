@@ -17,6 +17,8 @@ const UserSchema = new mongoose.Schema(
     department: { type: String },
     interests: [{ type: String }],
     avatar: { type: String },
+    isBlocked: { type: Boolean, default: false },
+    blockedAt: { type: Date },
   },
   { timestamps: true }
 );
@@ -26,6 +28,7 @@ const EventSchema = new mongoose.Schema(
     title: { type: String, required: true },
     description: { type: String, required: true },
     organizer: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    department: { type: String },
     date: { type: Date, required: true },
     venue: { type: String, required: true },
     category: { type: String, required: true },
@@ -34,8 +37,15 @@ const EventSchema = new mongoose.Schema(
       enum: ["pending", "approved", "rejected"],
       default: "pending",
     },
+    hodRecommendation: {
+      type: String,
+      enum: ["pending", "recommended", "not_recommended"],
+      default: "pending",
+    },
+    hodReviewedAt: { type: Date },
     bannerUrl: { type: String },
     registeredStudents: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    interestedStudents: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     capacity: { type: Number, required: true },
   },
   { timestamps: true }
@@ -59,12 +69,13 @@ async function seed() {
     const hodPassword = await bcrypt.hash("hod123", 12);
 
     // Create Admin
-    const admin = await User.create({
+    await User.create({
       name: "Admin User",
       email: "admin@college.com",
       password: hashedPassword,
       role: "admin",
       department: "Administration",
+      isBlocked: false,
     });
     console.log("👑 Admin created: admin@college.com / admin123");
 
@@ -75,6 +86,7 @@ async function seed() {
       password: hodPassword,
       role: "hod",
       department: "Computer Science",
+      isBlocked: false,
     });
 
     const hodMech = await User.create({
@@ -83,6 +95,7 @@ async function seed() {
       password: hodPassword,
       role: "hod",
       department: "Mechanical Engineering",
+      isBlocked: false,
     });
     console.log("🎓 HODs created: hod.cs@college.com, hod.mech@college.com / hod123");
 
@@ -105,6 +118,7 @@ async function seed() {
         ...s,
         password: studentPassword,
         role: "student",
+        isBlocked: false,
       }))
     );
     console.log("🧑‍🎓 10 Students created (password: student123)");
@@ -115,60 +129,79 @@ async function seed() {
         title: "Code Sprint 2026",
         description: "An intensive 24-hour coding competition where teams build innovative solutions. Prizes worth ₹50,000!",
         organizer: hodCS._id,
+        department: "Computer Science",
         date: new Date("2026-03-15"),
         venue: "CS Lab Complex, Block A",
         category: "Coding",
         status: "approved",
+        hodRecommendation: "recommended",
+        hodReviewedAt: new Date("2026-02-20"),
         bannerUrl: "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=800",
         registeredStudents: [students[0]._id, students[4]._id, students[8]._id],
+        interestedStudents: [students[2]._id, students[5]._id],
         capacity: 100,
       },
       {
         title: "AI & Machine Learning Workshop",
         description: "A hands-on workshop covering neural networks, deep learning, and practical AI applications with Python.",
         organizer: hodCS._id,
+        department: "Computer Science",
         date: new Date("2026-03-22"),
         venue: "Seminar Hall 1",
         category: "AI/ML",
         status: "approved",
+        hodRecommendation: "recommended",
+        hodReviewedAt: new Date("2026-02-24"),
         bannerUrl: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=800",
         registeredStudents: [students[0]._id, students[8]._id],
+        interestedStudents: [students[4]._id, students[9]._id],
         capacity: 60,
       },
       {
         title: "Annual Cultural Fest - Rhythm 2026",
         description: "The biggest cultural extravaganza of the year featuring dance, music, drama, and art competitions.",
         organizer: hodMech._id,
+        department: "Mechanical Engineering",
         date: new Date("2026-04-05"),
         venue: "Main Auditorium",
         category: "Cultural",
         status: "approved",
+        hodRecommendation: "recommended",
+        hodReviewedAt: new Date("2026-02-28"),
         bannerUrl: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800",
         registeredStudents: [students[1]._id, students[3]._id, students[6]._id, students[7]._id],
+        interestedStudents: [students[0]._id, students[5]._id],
         capacity: 500,
       },
       {
         title: "Robotics Expo 2026",
         description: "Showcase your robotics projects and compete in the bot-wars championship. Open to all departments.",
         organizer: hodMech._id,
+        department: "Mechanical Engineering",
         date: new Date("2026-04-20"),
         venue: "Innovation Center, Block D",
         category: "Robotics",
         status: "pending",
+        hodRecommendation: "recommended",
+        hodReviewedAt: new Date("2026-03-02"),
         bannerUrl: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=800",
         registeredStudents: [],
+        interestedStudents: [students[2]._id],
         capacity: 80,
       },
       {
         title: "Industry Connect Seminar",
         description: "Top industry leaders share insights on career paths, emerging tech trends, and hiring expectations.",
         organizer: hodCS._id,
+        department: "Computer Science",
         date: new Date("2026-05-10"),
         venue: "Conference Hall, Admin Block",
         category: "Seminar",
         status: "pending",
+        hodRecommendation: "pending",
         bannerUrl: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800",
         registeredStudents: [],
+        interestedStudents: [students[4]._id],
         capacity: 200,
       },
     ]);

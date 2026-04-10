@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { getMyEvents } from "@/actions/hod";
+import { getMyEvents, getDepartmentEvents, getDepartmentParticipationSummary } from "@/actions/hod";
 import HodDashboardClient from "./HodDashboardClient";
 
 export default async function HodDashboard() {
@@ -9,7 +9,18 @@ export default async function HodDashboard() {
     redirect("/");
   }
 
-  const events = await getMyEvents();
+  const [events, departmentEvents, participationSummary] = await Promise.all([
+    getMyEvents(),
+    getDepartmentEvents(),
+    getDepartmentParticipationSummary(),
+  ]);
 
-  return <HodDashboardClient session={session} events={events} />;
+  return (
+    <HodDashboardClient
+      session={session}
+      events={events}
+      departmentEvents={departmentEvents}
+      participationSummary={participationSummary}
+    />
+  );
 }

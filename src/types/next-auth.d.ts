@@ -7,12 +7,14 @@ declare module "next-auth" {
       id: string;
       role: string;
       department: string;
+      isBlocked?: boolean;
     } & DefaultSession["user"];
   }
 
   interface User extends DefaultUser {
     role?: string;
     department?: string;
+    isBlocked?: boolean;
   }
 }
 
@@ -21,5 +23,6 @@ declare module "next-auth/jwt" {
     role?: string;
     id?: string;
     department?: string;
+    isBlocked?: boolean;
   }
 }

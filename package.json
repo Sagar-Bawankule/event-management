@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "seed": "tsx scripts/seed.ts"
+    "seed": "tsx scripts/seed.ts",
+    "migrate:approval-stage": "tsx scripts/migrate-hod-recommendation.ts",
+    "migrate:approval-stage:apply": "tsx scripts/migrate-hod-recommendation.ts --apply"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.11",

@@ -34,6 +34,7 @@ export async function registerStudent(formData: FormData) {
       role: "student", // HARDCODED - Security: No role selection allowed
       department,
       interests,
+      isBlocked: false,
     });
 
     return { success: true };
@@ -52,16 +53,24 @@ export async function loginUser(formData: FormData) {
   }
 
   try {
+    await connectDB();
+    const existingUser = await User.findOne({ email }).select("role isBlocked");
+    if (!existingUser) {
+      return { error: "Invalid email or password" };
+    }
+
+    if (existingUser.isBlocked) {
+      return { error: "Your account is blocked. Please contact admin." };
+    }
+
     await signIn("credentials", {
       email,
       password,
       redirect: false,
     });
 
-    // Get user role for redirect
-    await connectDB();
-    const user = await User.findOne({ email });
-    if (!user) return { error: "Invalid credentials" };
+    const user = await User.findOne({ email }).select("role");
+    if (!user) return { error: "Invalid email or password" };
 
     let redirectUrl = "/student/dashboard";
     if (user.role === "admin") redirectUrl = "/admin/dashboard";

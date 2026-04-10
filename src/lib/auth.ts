@@ -25,6 +25,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           return null;
         }
 
+        if (user.isBlocked) {
+          return null;
+        }
+
         const isValid = await bcrypt.compare(
           credentials.password as string,
           user.password
@@ -40,6 +44,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           role: user.role,
           department: user.department,
           image: user.avatar,
+          isBlocked: user.isBlocked,
         };
       },
     }),
@@ -50,6 +55,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.role = user.role;
         token.id = user.id;
         token.department = user.department;
+        token.isBlocked = user.isBlocked;
       }
       return token;
     },
@@ -58,6 +64,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.role = token.role as string;
         session.user.id = token.id as string;
         session.user.department = token.department as string;
+        session.user.isBlocked = Boolean(token.isBlocked);
       }
       return session;
     },

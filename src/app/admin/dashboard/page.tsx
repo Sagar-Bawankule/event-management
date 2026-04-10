@@ -9,11 +9,10 @@ export default async function AdminDashboard() {
     redirect("/");
   }
 
-  const [stats, pendingEvents, students, hods, allEvents] = await Promise.all([
+  const [stats, pendingEvents, users, allEvents] = await Promise.all([
     getAdminStats(),
     getPendingEvents(),
-    getAllUsers("student"),
-    getAllUsers("hod"),
+    getAllUsers("all"),
     getAllEvents(),
   ]);
 
@@ -22,8 +21,7 @@ export default async function AdminDashboard() {
       session={session}
       stats={stats}
       pendingEvents={pendingEvents}
-      students={students}
-      hods={hods}
+      users={users}
       allEvents={allEvents}
     />
   );

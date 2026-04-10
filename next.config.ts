@@ -29,6 +29,11 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
+        hostname: "**.mm.bing.net",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
         hostname: "*.cloudinary.com",
         pathname: "/**",
       },

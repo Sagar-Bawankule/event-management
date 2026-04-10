@@ -1,19 +1,22 @@
 "use client";
 
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
-  Users,
-  CalendarCheck,
-  Clock,
-  ShieldCheck,
-  UserPlus,
-  CheckCircle2,
-  XCircle,
-  Trash2,
-  GraduationCap,
+  Ban,
+  BarChart3,
   Building2,
+  CalendarCheck,
   CalendarX,
+  CheckCircle2,
+  Clock,
+  Download,
+  GraduationCap,
+  ShieldCheck,
+  Trash2,
+  UserPlus,
+  Users,
+  XCircle,
 } from "lucide-react";
 import { Session } from "next-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,13 +26,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -38,396 +42,871 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/components/ui/toaster";
-import { createHod, approveEvent, rejectEvent, deleteUser } from "@/actions/admin";
-import { DEPARTMENTS } from "@/lib/constants";
+import {
+  approveEvent,
+  createUser,
+  deleteEvent,
+  deleteUser,
+  rejectEvent,
+  toggleUserBlock,
+} from "@/actions/admin";
+import { DEPARTMENTS, INTEREST_TAGS } from "@/lib/constants";
 import DashboardLayout from "@/components/DashboardLayout";
+
+type UserRole = "student" | "hod" | "admin";
+
+interface AdminStats {
+  totalUsers: number;
+  totalStudents: number;
+  totalHods: number;
+  totalBlockedUsers: number;
+  totalEvents: number;
+  pendingEvents: number;
+  approvedEvents: number;
+  rejectedEvents: number;
+  totalRegistrations: number;
+  totalInterestedMarks: number;
+  avgEventFillRate: number;
+  engagementRate: number;
+}
+
+interface DashboardUser {
+  _id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  department?: string;
+  interests?: string[];
+  isBlocked?: boolean;
+  createdAt: string;
+}
+
+interface DashboardEvent {
+  _id: string;
+  title: string;
+  description: string;
+  date: string;
+  venue: string;
+  category: string;
+  department?: string;
+  status: "pending" | "approved" | "rejected";
+  hodRecommendation?: "pending" | "recommended" | "not_recommended";
+  organizer?: {
+    name?: string;
+    email?: string;
+    department?: string;
+  };
+  registeredStudents?: unknown[];
+  interestedStudents?: unknown[];
+  capacity: number;
+  createdAt: string;
+}
 
 interface AdminDashboardClientProps {
   session: Session;
-  stats: {
-    totalUsers: number;
-    totalStudents: number;
-    totalHods: number;
-    pendingEvents: number;
-    approvedEvents: number;
-    rejectedEvents: number;
-  };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  pendingEvents: any[];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  students: any[];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  hods: any[];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  allEvents: any[];
+  stats: AdminStats;
+  pendingEvents: DashboardEvent[];
+  users: DashboardUser[];
+  allEvents: DashboardEvent[];
 }
 
-const fadeIn = {
-  initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.4 },
-};
+function statusVariant(status: string): "success" | "warning" | "destructive" {
+  if (status === "approved") return "success";
+  if (status === "pending") return "warning";
+  return "destructive";
+}
+
+function recommendationVariant(
+  recommendation: string
+): "success" | "warning" | "destructive" {
+  if (recommendation === "recommended") return "success";
+  if (recommendation === "not_recommended") return "destructive";
+  return "warning";
+}
+
+function recommendationLabel(recommendation?: string) {
+  if (recommendation === "recommended") return "Recommended";
+  if (recommendation === "not_recommended") return "Not Recommended";
+  return "Pending HOD Review";
+}
+
+function roleBadgeClass(role: UserRole) {
+  if (role === "admin") return "bg-violet-100 text-violet-700 border-violet-200";
+  if (role === "hod") return "bg-blue-100 text-blue-700 border-blue-200";
+  return "bg-green-100 text-green-700 border-green-200";
+}
+
+function convertToCsv(rows: Array<Record<string, string | number | boolean>>) {
+  if (!rows.length) return "";
+
+  const headers = Object.keys(rows[0]);
+  const escapeCell = (value: string | number | boolean) => {
+    const normalized = String(value ?? "").replace(/"/g, '""');
+    return `"${normalized}"`;
+  };
+
+  return [
+    headers.join(","),
+    ...rows.map((row) => headers.map((header) => escapeCell(row[header])).join(",")),
+  ].join("\n");
+}
+
+function downloadCsv(filename: string, rows: Array<Record<string, string | number | boolean>>) {
+  const csv = convertToCsv(rows);
+  if (!csv) return;
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.setAttribute("download", filename);
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
 
 export default function AdminDashboardClient({
   session,
   stats,
   pendingEvents,
-  students,
-  hods,
+  users,
   allEvents,
 }: AdminDashboardClientProps) {
   const { toast } = useToast();
-  const [hodDialogOpen, setHodDialogOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [selectedDept, setSelectedDept] = useState("");
+  const router = useRouter();
 
-  async function handleCreateHod(formData: FormData) {
+  const [createUserOpen, setCreateUserOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<UserRole>("student");
+  const [selectedDept, setSelectedDept] = useState("");
+  const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+  const [userSearch, setUserSearch] = useState("");
+  const [eventSearch, setEventSearch] = useState("");
+
+  const filteredUsers = useMemo(() => {
+    const normalized = userSearch.trim().toLowerCase();
+    if (!normalized) return users;
+
+    return users.filter((user) =>
+      `${user.name} ${user.email} ${user.role} ${user.department || ""}`
+        .toLowerCase()
+        .includes(normalized)
+    );
+  }, [users, userSearch]);
+
+  const filteredEvents = useMemo(() => {
+    const normalized = eventSearch.trim().toLowerCase();
+    if (!normalized) return allEvents;
+
+    return allEvents.filter((event) =>
+      `${event.title} ${event.category} ${event.venue} ${event.department || ""} ${event.organizer?.name || ""}`
+        .toLowerCase()
+        .includes(normalized)
+    );
+  }, [allEvents, eventSearch]);
+
+  const topEvents = useMemo(() => {
+    return [...allEvents]
+      .sort(
+        (a, b) =>
+          (b.registeredStudents?.length || 0) - (a.registeredStudents?.length || 0)
+      )
+      .slice(0, 5);
+  }, [allEvents]);
+
+  const departmentSummary = useMemo(() => {
+    const counter = new Map<string, { events: number; registrations: number }>();
+
+    allEvents.forEach((event) => {
+      const key = event.department || event.organizer?.department || "Unassigned";
+      const current = counter.get(key) || { events: 0, registrations: 0 };
+      current.events += 1;
+      current.registrations += event.registeredStudents?.length || 0;
+      counter.set(key, current);
+    });
+
+    return Array.from(counter.entries())
+      .map(([department, value]) => ({ department, ...value }))
+      .sort((a, b) => b.events - a.events);
+  }, [allEvents]);
+
+  async function handleCreateUser(formData: FormData) {
     setLoading(true);
-    formData.set("department", selectedDept);
-    const result = await createHod(formData);
+    formData.set("role", selectedRole);
+
+    if (selectedDept) {
+      formData.set("department", selectedDept);
+    } else {
+      formData.delete("department");
+    }
+
+    formData.delete("interests");
+    if (selectedRole === "student") {
+      selectedInterests.forEach((interest) => formData.append("interests", interest));
+    }
+
+    const result = await createUser(formData);
     setLoading(false);
+
     if (result.error) {
       toast({ title: "Error", description: result.error, variant: "destructive" });
-    } else {
-      toast({ title: "Success", description: "HOD created successfully!", variant: "success" });
-      setHodDialogOpen(false);
+      return;
     }
+
+    toast({
+      title: "User created",
+      description: result.message || "New user has been added",
+      variant: "success",
+    });
+
+    setCreateUserOpen(false);
+    setSelectedRole("student");
+    setSelectedDept("");
+    setSelectedInterests([]);
+    router.refresh();
   }
 
   async function handleApprove(eventId: string) {
     const result = await approveEvent(eventId);
     if (result.error) {
       toast({ title: "Error", description: result.error, variant: "destructive" });
-    } else {
-      toast({ title: "Approved!", description: "Event has been approved", variant: "success" });
+      return;
     }
+    toast({ title: "Approved", description: "Event approved successfully", variant: "success" });
+    router.refresh();
   }
 
   async function handleReject(eventId: string) {
     const result = await rejectEvent(eventId);
     if (result.error) {
       toast({ title: "Error", description: result.error, variant: "destructive" });
-    } else {
-      toast({ title: "Rejected", description: "Event has been rejected" });
+      return;
     }
+    toast({ title: "Rejected", description: "Event rejected" });
+    router.refresh();
+  }
+
+  async function handleDeleteEvent(eventId: string) {
+    if (!confirm("Delete this event permanently?")) return;
+
+    const result = await deleteEvent(eventId);
+    if (result.error) {
+      toast({ title: "Error", description: result.error, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Deleted", description: "Event removed", variant: "success" });
+    router.refresh();
   }
 
   async function handleDeleteUser(userId: string) {
-    if (!confirm("Are you sure you want to delete this user?")) return;
+    if (!confirm("Delete this user account?")) return;
+
     const result = await deleteUser(userId);
     if (result.error) {
       toast({ title: "Error", description: result.error, variant: "destructive" });
-    } else {
-      toast({ title: "Deleted", description: "User has been removed" });
+      return;
     }
+    toast({ title: "Deleted", description: "User removed", variant: "success" });
+    router.refresh();
+  }
+
+  async function handleToggleBlock(user: DashboardUser) {
+    const shouldBlock = !user.isBlocked;
+    const result = await toggleUserBlock(user._id, shouldBlock);
+    if (result.error) {
+      toast({ title: "Error", description: result.error, variant: "destructive" });
+      return;
+    }
+    toast({
+      title: shouldBlock ? "User blocked" : "User unblocked",
+      description: `${user.name} is now ${shouldBlock ? "blocked" : "active"}`,
+      variant: "success",
+    });
+    router.refresh();
+  }
+
+  function toggleInterest(tag: string) {
+    setSelectedInterests((prev) =>
+      prev.includes(tag) ? prev.filter((item) => item !== tag) : [...prev, tag]
+    );
+  }
+
+  function downloadUsersReport() {
+    const rows = users.map((user) => ({
+      Name: user.name,
+      Email: user.email,
+      Role: user.role,
+      Department: user.department || "",
+      Blocked: Boolean(user.isBlocked),
+      Interests: (user.interests || []).join(" | "),
+      JoinedAt: new Date(user.createdAt).toLocaleDateString(),
+    }));
+    downloadCsv("users-report.csv", rows);
+  }
+
+  function downloadEventsReport() {
+    const rows = allEvents.map((event) => {
+      const registrations = event.registeredStudents?.length || 0;
+      const interested = event.interestedStudents?.length || 0;
+      const fillRate = event.capacity > 0 ? ((registrations / event.capacity) * 100).toFixed(1) : "0";
+
+      return {
+        Title: event.title,
+        Category: event.category,
+        Department: event.department || event.organizer?.department || "",
+        Date: new Date(event.date).toLocaleDateString(),
+        Status: event.status,
+        Organizer: event.organizer?.name || "",
+        Capacity: event.capacity,
+        Registrations: registrations,
+        Interested: interested,
+        FillRatePercent: Number(fillRate),
+      };
+    });
+
+    downloadCsv("events-report.csv", rows);
+  }
+
+  function downloadSummaryReport() {
+    const rows = [
+      {
+        TotalUsers: stats.totalUsers,
+        TotalEvents: stats.totalEvents,
+        TotalRegistrations: stats.totalRegistrations,
+        TotalInterestedMarks: stats.totalInterestedMarks,
+        AvgFillRatePercent: stats.avgEventFillRate,
+        EngagementRatePercent: stats.engagementRate,
+        PendingEvents: stats.pendingEvents,
+        ApprovedEvents: stats.approvedEvents,
+        RejectedEvents: stats.rejectedEvents,
+      },
+    ];
+
+    downloadCsv("engagement-summary.csv", rows);
   }
 
   const kpiCards = [
-    { title: "Total Users", value: stats.totalUsers, icon: Users, color: "text-blue-600", bg: "bg-blue-50" },
-    { title: "Pending Events", value: stats.pendingEvents, icon: Clock, color: "text-yellow-600", bg: "bg-yellow-50" },
-    { title: "Approved Events", value: stats.approvedEvents, icon: CalendarCheck, color: "text-green-600", bg: "bg-green-50" },
-    { title: "Total HODs", value: stats.totalHods, icon: ShieldCheck, color: "text-violet-600", bg: "bg-violet-50" },
+    {
+      title: "Total Users",
+      value: stats.totalUsers,
+      icon: Users,
+      color: "text-blue-600",
+      bg: "bg-blue-50",
+    },
+    {
+      title: "Total Events",
+      value: stats.totalEvents,
+      icon: CalendarCheck,
+      color: "text-violet-600",
+      bg: "bg-violet-50",
+    },
+    {
+      title: "Total Registrations",
+      value: stats.totalRegistrations,
+      icon: CheckCircle2,
+      color: "text-green-600",
+      bg: "bg-green-50",
+    },
+    {
+      title: "Blocked Users",
+      value: stats.totalBlockedUsers,
+      icon: Ban,
+      color: "text-red-600",
+      bg: "bg-red-50",
+    },
+    {
+      title: "Avg Fill Rate",
+      value: `${stats.avgEventFillRate}%`,
+      icon: BarChart3,
+      color: "text-amber-600",
+      bg: "bg-amber-50",
+    },
+    {
+      title: "Engagement Rate",
+      value: `${stats.engagementRate}%`,
+      icon: ShieldCheck,
+      color: "text-indigo-600",
+      bg: "bg-indigo-50",
+    },
   ];
 
   return (
     <DashboardLayout session={session} role="admin">
       <div className="space-y-8">
-        {/* Header */}
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
           <p className="text-muted-foreground mt-1">
-            Manage events, users, and HODs from one place.
+            Analytics, user administration, event operations, and reports in one place.
           </p>
         </div>
 
-        {/* KPI Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {kpiCards.map((kpi, i) => (
-            <motion.div key={kpi.title} {...fadeIn} transition={{ delay: i * 0.1 }}>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    {kpi.title}
-                  </CardTitle>
-                  <div className={`p-2 rounded-lg ${kpi.bg}`}>
-                    <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold">{kpi.value}</div>
-                </CardContent>
-              </Card>
-            </motion.div>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {kpiCards.map((kpi) => (
+            <Card key={kpi.title}>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  {kpi.title}
+                </CardTitle>
+                <div className={`p-2 rounded-lg ${kpi.bg}`}>
+                  <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold">{kpi.value}</div>
+              </CardContent>
+            </Card>
           ))}
         </div>
 
-        {/* Main Tabs */}
-        <Tabs defaultValue="pending" className="space-y-4">
+        <Tabs defaultValue="analytics" className="space-y-4">
           <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="pending">
-              <Clock className="mr-2 h-4 w-4" /> Pending ({pendingEvents.length})
+            <TabsTrigger value="analytics">
+              <BarChart3 className="mr-2 h-4 w-4" /> Analytics
+            </TabsTrigger>
+            <TabsTrigger value="users">
+              <Users className="mr-2 h-4 w-4" /> Users
             </TabsTrigger>
             <TabsTrigger value="events">
-              <CalendarCheck className="mr-2 h-4 w-4" /> All Events
+              <CalendarCheck className="mr-2 h-4 w-4" /> Events
             </TabsTrigger>
-            <TabsTrigger value="students">
-              <GraduationCap className="mr-2 h-4 w-4" /> Students
-            </TabsTrigger>
-            <TabsTrigger value="hods">
-              <Building2 className="mr-2 h-4 w-4" /> HODs
+            <TabsTrigger value="reports">
+              <Download className="mr-2 h-4 w-4" /> Reports
             </TabsTrigger>
           </TabsList>
 
-          {/* Pending Events Tab */}
-          <TabsContent value="pending">
-            <Card>
-              <CardHeader>
-                <CardTitle>Event Approval Queue</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {pendingEvents.length === 0 ? (
-                  <div className="text-center py-10 text-muted-foreground">
-                    <CalendarX className="h-12 w-12 mx-auto mb-3 opacity-40" />
-                    <p>No pending events to review</p>
+          <TabsContent value="analytics" className="space-y-4">
+            <div className="grid gap-4 lg:grid-cols-3">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Users by Role</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-2"><GraduationCap className="h-4 w-4 text-green-600" /> Students</span>
+                    <span className="font-semibold">{stats.totalStudents}</span>
                   </div>
-                ) : (
-                  <div className="space-y-4">
-                    {pendingEvents.map((event) => (
-                      <motion.div
-                        key={event._id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className="flex items-center justify-between p-4 rounded-lg border bg-white hover:shadow-sm transition-shadow"
-                      >
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-lg">{event.title}</h3>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {event.description.substring(0, 100)}...
-                          </p>
-                          <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
-                            <span>📅 {new Date(event.date).toLocaleDateString()}</span>
-                            <span>📍 {event.venue}</span>
-                            <span>🏷️ {event.category}</span>
-                            <span>👤 {event.organizer?.name}</span>
-                            <span>👥 Capacity: {event.capacity}</span>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-2"><Building2 className="h-4 w-4 text-blue-600" /> HODs</span>
+                    <span className="font-semibold">{stats.totalHods}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-2"><Ban className="h-4 w-4 text-red-600" /> Blocked</span>
+                    <span className="font-semibold">{stats.totalBlockedUsers}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Event Status</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-2"><Clock className="h-4 w-4 text-amber-600" /> Awaiting Admin Final</span>
+                    <span className="font-semibold">{stats.pendingEvents}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" /> Approved</span>
+                    <span className="font-semibold">{stats.approvedEvents}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-2"><XCircle className="h-4 w-4 text-red-600" /> Rejected</span>
+                    <span className="font-semibold">{stats.rejectedEvents}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Participation Metrics</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span>Registrations</span>
+                    <span className="font-semibold">{stats.totalRegistrations}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span>Interested Marks</span>
+                    <span className="font-semibold">{stats.totalInterestedMarks}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span>Avg Fill Rate</span>
+                    <span className="font-semibold">{stats.avgEventFillRate}%</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="users" className="space-y-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>User Management</CardTitle>
+                <Dialog open={createUserOpen} onOpenChange={setCreateUserOpen}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <UserPlus className="mr-2 h-4 w-4" /> Add User
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                      <DialogTitle>Create User Account</DialogTitle>
+                      <DialogDescription>
+                        Create a student, HOD, or admin account.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form action={handleCreateUser} className="space-y-4">
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="new-name">Name</Label>
+                          <Input id="new-name" name="name" required />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="new-email">Email</Label>
+                          <Input id="new-email" name="email" type="email" required />
+                        </div>
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label>User Role</Label>
+                          <Select
+                            value={selectedRole}
+                            onValueChange={(value) => {
+                              const role = value as UserRole;
+                              setSelectedRole(role);
+                              if (role === "admin") {
+                                setSelectedDept("");
+                                setSelectedInterests([]);
+                              }
+                              if (role === "hod") {
+                                setSelectedInterests([]);
+                              }
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="student">Student</SelectItem>
+                              <SelectItem value="hod">HOD</SelectItem>
+                              <SelectItem value="admin">Admin</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="new-password">Password</Label>
+                          <Input id="new-password" name="password" defaultValue="user123" />
+                        </div>
+                      </div>
+
+                      {(selectedRole === "student" || selectedRole === "hod") && (
+                        <div className="space-y-2">
+                          <Label>Department</Label>
+                          <Select value={selectedDept} onValueChange={setSelectedDept}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select department" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {DEPARTMENTS.map((department) => (
+                                <SelectItem key={department} value={department}>
+                                  {department}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      {selectedRole === "student" && (
+                        <div className="space-y-2">
+                          <Label>Interests</Label>
+                          <div className="grid grid-cols-2 gap-2 max-h-44 overflow-y-auto border rounded-md p-3">
+                            {INTEREST_TAGS.map((tag) => (
+                              <div key={tag} className="flex items-center gap-2">
+                                <Checkbox
+                                  id={`new-${tag}`}
+                                  checked={selectedInterests.includes(tag)}
+                                  onCheckedChange={() => toggleInterest(tag)}
+                                />
+                                <Label htmlFor={`new-${tag}`} className="text-xs">
+                                  {tag}
+                                </Label>
+                              </div>
+                            ))}
                           </div>
                         </div>
-                        <div className="flex gap-2 ml-4">
-                          <Button
-                            size="sm"
-                            onClick={() => handleApprove(event._id)}
-                            className="bg-green-600 hover:bg-green-700"
-                          >
-                            <CheckCircle2 className="mr-1 h-4 w-4" /> Approve
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleReject(event._id)}
-                          >
-                            <XCircle className="mr-1 h-4 w-4" /> Reject
-                          </Button>
-                        </div>
-                      </motion.div>
-                    ))}
+                      )}
+
+                      <Button type="submit" disabled={loading} className="w-full">
+                        {loading ? "Creating..." : "Create User"}
+                      </Button>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </CardHeader>
+
+              <CardContent className="space-y-4">
+                <Input
+                  placeholder="Search users by name, email, role, or department"
+                  value={userSearch}
+                  onChange={(event) => setUserSearch(event.target.value)}
+                />
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="text-left p-3 font-medium">Name</th>
+                        <th className="text-left p-3 font-medium">Email</th>
+                        <th className="text-left p-3 font-medium">Role</th>
+                        <th className="text-left p-3 font-medium">Department</th>
+                        <th className="text-left p-3 font-medium">Status</th>
+                        <th className="text-left p-3 font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredUsers.map((user) => (
+                        <tr key={user._id} className="border-b hover:bg-muted/20">
+                          <td className="p-3 font-medium">{user.name}</td>
+                          <td className="p-3">{user.email}</td>
+                          <td className="p-3">
+                            <Badge variant="outline" className={roleBadgeClass(user.role)}>
+                              {user.role.toUpperCase()}
+                            </Badge>
+                          </td>
+                          <td className="p-3">{user.department || "-"}</td>
+                          <td className="p-3">
+                            {user.isBlocked ? (
+                              <Badge variant="destructive">Blocked</Badge>
+                            ) : (
+                              <Badge variant="success">Active</Badge>
+                            )}
+                          </td>
+                          <td className="p-3">
+                            <div className="flex items-center gap-2">
+                              {user.role !== "admin" && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleToggleBlock(user)}
+                                >
+                                  {user.isBlocked ? "Unblock" : "Block"}
+                                </Button>
+                              )}
+                              {user.role !== "admin" && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  onClick={() => handleDeleteUser(user._id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="events" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between gap-4">
+                  <span>All Events</span>
+                  <span className="text-sm font-normal text-muted-foreground">
+                    Pending Queue: {pendingEvents.length}
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Input
+                  placeholder="Search events by title, department, organizer, category, or venue"
+                  value={eventSearch}
+                  onChange={(event) => setEventSearch(event.target.value)}
+                />
+
+                {filteredEvents.length === 0 ? (
+                  <div className="text-center py-10 text-muted-foreground">
+                    <CalendarX className="h-10 w-10 mx-auto mb-3 opacity-40" />
+                    <p>No events match your search</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b bg-muted/50">
+                          <th className="text-left p-3 font-medium">Title</th>
+                          <th className="text-left p-3 font-medium">Department</th>
+                          <th className="text-left p-3 font-medium">Date</th>
+                          <th className="text-left p-3 font-medium">Status</th>
+                          <th className="text-left p-3 font-medium">HOD Recommendation</th>
+                          <th className="text-left p-3 font-medium">Engagement</th>
+                          <th className="text-left p-3 font-medium">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredEvents.map((event) => {
+                          const registrations = event.registeredStudents?.length || 0;
+                          const interested = event.interestedStudents?.length || 0;
+
+                          return (
+                            <tr key={event._id} className="border-b hover:bg-muted/20">
+                              <td className="p-3">
+                                <p className="font-medium">{event.title}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {event.organizer?.name || "Unknown organizer"}
+                                </p>
+                              </td>
+                              <td className="p-3">{event.department || event.organizer?.department || "-"}</td>
+                              <td className="p-3">{new Date(event.date).toLocaleDateString()}</td>
+                              <td className="p-3">
+                                <Badge variant={statusVariant(event.status)}>{event.status}</Badge>
+                              </td>
+                              <td className="p-3">
+                                <Badge
+                                  variant={recommendationVariant(event.hodRecommendation || "pending")}
+                                >
+                                  {recommendationLabel(event.hodRecommendation)}
+                                </Badge>
+                              </td>
+                              <td className="p-3">
+                                <div className="text-xs">
+                                  <p>{registrations}/{event.capacity} registered</p>
+                                  <p className="text-muted-foreground">{interested} interested</p>
+                                </div>
+                              </td>
+                              <td className="p-3">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  {event.status === "pending" && event.hodRecommendation === "recommended" && (
+                                    <Button size="sm" onClick={() => handleApprove(event._id)}>
+                                      Approve
+                                    </Button>
+                                  )}
+                                  {event.status === "pending" && event.hodRecommendation === "recommended" && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleReject(event._id)}
+                                    >
+                                      Reject
+                                    </Button>
+                                  )}
+                                  {event.status === "pending" && event.hodRecommendation !== "recommended" && (
+                                    <span className="text-xs text-muted-foreground">
+                                      Awaiting HOD recommendation
+                                    </span>
+                                  )}
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    onClick={() => handleDeleteEvent(event._id)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </CardContent>
             </Card>
           </TabsContent>
 
-          {/* All Events Tab */}
-          <TabsContent value="events">
-            <Card>
-              <CardHeader>
-                <CardTitle>All Events</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b bg-muted/50">
-                        <th className="text-left p-3 font-medium">Title</th>
-                        <th className="text-left p-3 font-medium">Category</th>
-                        <th className="text-left p-3 font-medium">Date</th>
-                        <th className="text-left p-3 font-medium">Organizer</th>
-                        <th className="text-left p-3 font-medium">Status</th>
-                        <th className="text-left p-3 font-medium">Registrations</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {allEvents.map((event) => (
-                        <tr key={event._id} className="border-b hover:bg-muted/30">
-                          <td className="p-3 font-medium">{event.title}</td>
-                          <td className="p-3">{event.category}</td>
-                          <td className="p-3">{new Date(event.date).toLocaleDateString()}</td>
-                          <td className="p-3">{event.organizer?.name || "N/A"}</td>
-                          <td className="p-3">
-                            <Badge
-                              variant={
-                                event.status === "approved"
-                                  ? "success"
-                                  : event.status === "pending"
-                                  ? "warning"
-                                  : "destructive"
-                              }
-                            >
-                              {event.status}
-                            </Badge>
-                          </td>
-                          <td className="p-3">{event.registeredStudents?.length || 0} / {event.capacity}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+          <TabsContent value="reports" className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-3">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Export Users</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Button className="w-full" variant="outline" onClick={downloadUsersReport}>
+                    <Download className="mr-2 h-4 w-4" /> Download CSV
+                  </Button>
+                </CardContent>
+              </Card>
 
-          {/* Students Tab */}
-          <TabsContent value="students">
-            <Card>
-              <CardHeader>
-                <CardTitle>Students ({students.length})</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b bg-muted/50">
-                        <th className="text-left p-3 font-medium">Name</th>
-                        <th className="text-left p-3 font-medium">Email</th>
-                        <th className="text-left p-3 font-medium">Department</th>
-                        <th className="text-left p-3 font-medium">Interests</th>
-                        <th className="text-left p-3 font-medium">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {students.map((student) => (
-                        <tr key={student._id} className="border-b hover:bg-muted/30">
-                          <td className="p-3 font-medium">{student.name}</td>
-                          <td className="p-3">{student.email}</td>
-                          <td className="p-3">{student.department}</td>
-                          <td className="p-3">
-                            <div className="flex flex-wrap gap-1">
-                              {student.interests?.slice(0, 3).map((i: string) => (
-                                <Badge key={i} variant="secondary" className="text-xs">
-                                  {i}
-                                </Badge>
-                              ))}
-                            </div>
-                          </td>
-                          <td className="p-3">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                              onClick={() => handleDeleteUser(student._id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Export Events</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Button className="w-full" variant="outline" onClick={downloadEventsReport}>
+                    <Download className="mr-2 h-4 w-4" /> Download CSV
+                  </Button>
+                </CardContent>
+              </Card>
 
-          {/* HODs Tab */}
-          <TabsContent value="hods">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>HOD Management</CardTitle>
-                <Dialog open={hodDialogOpen} onOpenChange={setHodDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <UserPlus className="mr-2 h-4 w-4" /> Add HOD
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Create New HOD</DialogTitle>
-                      <DialogDescription>
-                        Add a new Head of Department. They will be able to create and manage events.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <form action={handleCreateHod} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="name">Full Name</Label>
-                        <Input id="name" name="name" placeholder="Dr. John Doe" required />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="email">Email</Label>
-                        <Input id="email" name="email" type="email" placeholder="hod@college.com" required />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="department">Department</Label>
-                        <Select value={selectedDept} onValueChange={setSelectedDept}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select department" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {DEPARTMENTS.map((dept) => (
-                              <SelectItem key={dept} value={dept}>
-                                {dept}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="password">Default Password</Label>
-                        <Input id="password" name="password" defaultValue="hod123" placeholder="Default password" />
-                      </div>
-                      <Button type="submit" className="w-full" disabled={loading}>
-                        {loading ? "Creating..." : "Create HOD"}
-                      </Button>
-                    </form>
-                  </DialogContent>
-                </Dialog>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b bg-muted/50">
-                        <th className="text-left p-3 font-medium">Name</th>
-                        <th className="text-left p-3 font-medium">Email</th>
-                        <th className="text-left p-3 font-medium">Department</th>
-                        <th className="text-left p-3 font-medium">Joined</th>
-                        <th className="text-left p-3 font-medium">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {hods.map((hod) => (
-                        <tr key={hod._id} className="border-b hover:bg-muted/30">
-                          <td className="p-3 font-medium">{hod.name}</td>
-                          <td className="p-3">{hod.email}</td>
-                          <td className="p-3">
-                            <Badge variant="outline">{hod.department}</Badge>
-                          </td>
-                          <td className="p-3">{new Date(hod.createdAt).toLocaleDateString()}</td>
-                          <td className="p-3">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                              onClick={() => handleDeleteUser(hod._id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Engagement Summary</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Button className="w-full" variant="outline" onClick={downloadSummaryReport}>
+                    <Download className="mr-2 h-4 w-4" /> Download CSV
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Top Events by Registrations</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {topEvents.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No event data available</p>
+                    ) : (
+                      topEvents.map((event, index) => (
+                        <div key={event._id} className="flex items-center justify-between text-sm">
+                          <span className="truncate pr-3">{index + 1}. {event.title}</span>
+                          <span className="font-semibold">
+                            {event.registeredStudents?.length || 0}/{event.capacity}
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Department Event Summary</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {departmentSummary.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No department data available</p>
+                    ) : (
+                      departmentSummary.map((item) => (
+                        <div key={item.department} className="flex items-center justify-between text-sm">
+                          <span className="truncate pr-3">{item.department}</span>
+                          <span className="font-semibold">
+                            {item.events} events / {item.registrations} regs
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </div>

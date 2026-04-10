@@ -9,6 +9,8 @@ export interface IUser extends Document {
   department?: string;
   interests: string[];
   avatar?: string;
+  isBlocked: boolean;
+  blockedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -26,6 +28,8 @@ const UserSchema = new Schema<IUser>(
     department: { type: String },
     interests: [{ type: String }],
     avatar: { type: String },
+    isBlocked: { type: Boolean, default: false, index: true },
+    blockedAt: { type: Date },
   },
   { timestamps: true }
 );

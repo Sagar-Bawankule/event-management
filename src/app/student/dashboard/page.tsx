@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { getRecommendedEvents, getApprovedEvents, getMyRegistrations, getProfile } from "@/actions/student";
+import { getRecommendedEvents, getApprovedEvents, getMyRegistrations, getInterestedEvents, getProfile } from "@/actions/student";
 import StudentDashboardClient from "./StudentDashboardClient";
 
 export default async function StudentDashboard() {
@@ -9,10 +9,11 @@ export default async function StudentDashboard() {
     redirect("/login");
   }
 
-  const [recommended, allEvents, myRegistrations, profile] = await Promise.all([
+  const [recommended, allEvents, myRegistrations, interestedEvents, profile] = await Promise.all([
     getRecommendedEvents(),
     getApprovedEvents(),
     getMyRegistrations(),
+    getInterestedEvents(),
     getProfile(),
   ]);
 
@@ -22,6 +23,7 @@ export default async function StudentDashboard() {
       recommended={recommended}
       allEvents={allEvents}
       myRegistrations={myRegistrations}
+      interestedEvents={interestedEvents}
       profile={profile}
     />
   );
