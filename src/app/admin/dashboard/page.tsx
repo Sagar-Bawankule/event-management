@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getAdminStats, getPendingEvents, getAllUsers, getAllEvents } from "@/actions/admin";
@@ -17,12 +18,14 @@ export default async function AdminDashboard() {
   ]);
 
   return (
-    <AdminDashboardClient
-      session={session}
-      stats={stats}
-      pendingEvents={pendingEvents}
-      users={users}
-      allEvents={allEvents}
-    />
+    <Suspense fallback={null}>
+      <AdminDashboardClient
+        session={session}
+        stats={stats}
+        pendingEvents={pendingEvents}
+        users={users}
+        allEvents={allEvents}
+      />
+    </Suspense>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   BarChart3,
   Building2,
@@ -114,6 +114,7 @@ export default function HodDashboardClient({
 }: HodDashboardClientProps) {
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -333,19 +334,7 @@ export default function HodDashboardClient({
           </Card>
         </div>
 
-        <Tabs defaultValue="approval" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="approval">
-              <CheckCircle2 className="mr-2 h-4 w-4" /> Recommend
-            </TabsTrigger>
-            <TabsTrigger value="events">
-              <Building2 className="mr-2 h-4 w-4" /> Department Events
-            </TabsTrigger>
-            <TabsTrigger value="participation">
-              <BarChart3 className="mr-2 h-4 w-4" /> Participation
-            </TabsTrigger>
-          </TabsList>
-
+        <Tabs value={searchParams.get("tab") || "approval"} className="space-y-4">
           <TabsContent value="approval">
             <Card>
               <CardHeader>

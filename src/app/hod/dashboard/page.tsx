@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getMyEvents, getDepartmentEvents, getDepartmentParticipationSummary } from "@/actions/hod";
@@ -16,11 +17,13 @@ export default async function HodDashboard() {
   ]);
 
   return (
-    <HodDashboardClient
-      session={session}
-      events={events}
-      departmentEvents={departmentEvents}
-      participationSummary={participationSummary}
-    />
+    <Suspense fallback={null}>
+      <HodDashboardClient
+        session={session}
+        events={events}
+        departmentEvents={departmentEvents}
+        participationSummary={participationSummary}
+      />
+    </Suspense>
   );
 }

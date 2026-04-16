@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Ban,
   BarChart3,
@@ -52,6 +52,7 @@ import {
 } from "@/actions/admin";
 import { DEPARTMENTS, INTEREST_TAGS } from "@/lib/constants";
 import DashboardLayout from "@/components/DashboardLayout";
+import AdminAnalyticsCharts from "@/components/AdminAnalyticsCharts";
 
 type UserRole = "student" | "hod" | "admin";
 
@@ -431,6 +432,9 @@ export default function AdminDashboardClient({
     },
   ];
 
+  const searchParams = useSearchParams();
+  const currentTab = searchParams.get("tab") || "analytics";
+
   return (
     <DashboardLayout session={session} role="admin">
       <div className="space-y-8">
@@ -459,84 +463,9 @@ export default function AdminDashboardClient({
           ))}
         </div>
 
-        <Tabs defaultValue="analytics" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="analytics">
-              <BarChart3 className="mr-2 h-4 w-4" /> Analytics
-            </TabsTrigger>
-            <TabsTrigger value="users">
-              <Users className="mr-2 h-4 w-4" /> Users
-            </TabsTrigger>
-            <TabsTrigger value="events">
-              <CalendarCheck className="mr-2 h-4 w-4" /> Events
-            </TabsTrigger>
-            <TabsTrigger value="reports">
-              <Download className="mr-2 h-4 w-4" /> Reports
-            </TabsTrigger>
-          </TabsList>
-
+        <Tabs value={currentTab} className="space-y-4">
           <TabsContent value="analytics" className="space-y-4">
-            <div className="grid gap-4 lg:grid-cols-3">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Users by Role</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="flex items-center gap-2"><GraduationCap className="h-4 w-4 text-green-600" /> Students</span>
-                    <span className="font-semibold">{stats.totalStudents}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="flex items-center gap-2"><Building2 className="h-4 w-4 text-blue-600" /> HODs</span>
-                    <span className="font-semibold">{stats.totalHods}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="flex items-center gap-2"><Ban className="h-4 w-4 text-red-600" /> Blocked</span>
-                    <span className="font-semibold">{stats.totalBlockedUsers}</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Event Status</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="flex items-center gap-2"><Clock className="h-4 w-4 text-amber-600" /> Awaiting Admin Final</span>
-                    <span className="font-semibold">{stats.pendingEvents}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" /> Approved</span>
-                    <span className="font-semibold">{stats.approvedEvents}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="flex items-center gap-2"><XCircle className="h-4 w-4 text-red-600" /> Rejected</span>
-                    <span className="font-semibold">{stats.rejectedEvents}</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Participation Metrics</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span>Registrations</span>
-                    <span className="font-semibold">{stats.totalRegistrations}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span>Interested Marks</span>
-                    <span className="font-semibold">{stats.totalInterestedMarks}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span>Avg Fill Rate</span>
-                    <span className="font-semibold">{stats.avgEventFillRate}%</span>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+            <AdminAnalyticsCharts stats={stats} allEvents={allEvents} />
           </TabsContent>
 
           <TabsContent value="users" className="space-y-4">

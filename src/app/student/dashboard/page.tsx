@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getRecommendedEvents, getApprovedEvents, getMyRegistrations, getInterestedEvents, getProfile } from "@/actions/student";
@@ -18,13 +19,15 @@ export default async function StudentDashboard() {
   ]);
 
   return (
-    <StudentDashboardClient
-      session={session}
-      recommended={recommended}
-      allEvents={allEvents}
-      myRegistrations={myRegistrations}
-      interestedEvents={interestedEvents}
-      profile={profile}
-    />
+    <Suspense fallback={null}>
+      <StudentDashboardClient
+        session={session}
+        recommended={recommended}
+        allEvents={allEvents}
+        myRegistrations={myRegistrations}
+        interestedEvents={interestedEvents}
+        profile={profile}
+      />
+    </Suspense>
   );
 }

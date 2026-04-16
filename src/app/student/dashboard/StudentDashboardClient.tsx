@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Brain,
   Calendar,
@@ -46,6 +46,7 @@ import {
 } from "@/actions/student";
 import { DEPARTMENTS, INTEREST_TAGS } from "@/lib/constants";
 import DashboardLayout from "@/components/DashboardLayout";
+import StudentChatbot from "@/components/StudentChatbot";
 
 interface DashboardEvent {
   _id: string;
@@ -101,6 +102,7 @@ export default function StudentDashboardClient({
 }: StudentDashboardClientProps) {
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -385,19 +387,7 @@ export default function StudentDashboardClient({
           </section>
         )}
 
-        <Tabs defaultValue="explore" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="explore">
-              <Search className="mr-2 h-4 w-4" /> Explore
-            </TabsTrigger>
-            <TabsTrigger value="interested">
-              <Heart className="mr-2 h-4 w-4" /> Interested ({interestedEvents.length})
-            </TabsTrigger>
-            <TabsTrigger value="registered">
-              <Ticket className="mr-2 h-4 w-4" /> Registered ({myRegistrations.length})
-            </TabsTrigger>
-          </TabsList>
-
+        <Tabs value={searchParams.get("tab") || "explore"} className="space-y-4">
           <TabsContent value="explore" className="space-y-4">
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="relative flex-1">
@@ -477,6 +467,7 @@ export default function StudentDashboardClient({
           </TabsContent>
         </Tabs>
       </div>
+      <StudentChatbot />
     </DashboardLayout>
   );
 }

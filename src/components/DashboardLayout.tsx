@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { Session } from "next-auth";
 import {
@@ -14,11 +14,21 @@ import {
   Shield,
   Building2,
   Sparkles,
+  User,
+  BarChart3,
+  Users,
+  CalendarCheck,
+  Download,
+  CheckCircle2,
+  Search,
+  Heart,
+  Ticket,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { ProfileDialog } from "@/components/ProfileDialog";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -33,7 +43,10 @@ const roleConfig = {
     color: "text-violet-600",
     bgColor: "bg-violet-50",
     navItems: [
-      { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/admin/dashboard?tab=analytics", label: "Analytics", icon: BarChart3 },
+      { href: "/admin/dashboard?tab=users", label: "Users", icon: Users },
+      { href: "/admin/dashboard?tab=events", label: "Events", icon: CalendarCheck },
+      { href: "/admin/dashboard?tab=reports", label: "Reports", icon: Download },
     ],
   },
   hod: {
@@ -42,7 +55,9 @@ const roleConfig = {
     color: "text-blue-600",
     bgColor: "bg-blue-50",
     navItems: [
-      { href: "/hod/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/hod/dashboard?tab=approval", label: "Recommend", icon: CheckCircle2 },
+      { href: "/hod/dashboard?tab=events", label: "Department Events", icon: Building2 },
+      { href: "/hod/dashboard?tab=participation", label: "Participation", icon: BarChart3 },
     ],
   },
   student: {
@@ -51,7 +66,9 @@ const roleConfig = {
     color: "text-green-600",
     bgColor: "bg-green-50",
     navItems: [
-      { href: "/student/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/student/dashboard?tab=explore", label: "Explore", icon: Search },
+      { href: "/student/dashboard?tab=interested", label: "Interested", icon: Heart },
+      { href: "/student/dashboard?tab=registered", label: "Registered", icon: Ticket },
     ],
   },
 };
@@ -59,6 +76,7 @@ const roleConfig = {
 export default function DashboardLayout({ children, session, role }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const config = roleConfig[role];
   const RoleIcon = config.icon;
 
@@ -106,10 +124,14 @@ export default function DashboardLayout({ children, session, role }: DashboardLa
           </div>
 
           {/* Nav Items */}
-          <nav className="flex-1 px-4 py-4 space-y-1">
+                  <nav className="flex-1 px-4 py-4 space-y-1">
             {config.navItems.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname === item.href;
+              const urlObj = new URL(item.href, "http://localhost");
+              const targetTab = urlObj.searchParams.get("tab");
+              
+              const currentTab = searchParams.get("tab") || config.navItems[0].href.split("tab=")[1];
+              const isActive = pathname === urlObj.pathname && targetTab === currentTab;
               return (
                 <Link
                   key={item.href}
@@ -147,15 +169,23 @@ export default function DashboardLayout({ children, session, role }: DashboardLa
               <RoleIcon className={cn("h-3.5 w-3.5", config.color)} />
               <span className={cn("text-xs font-medium uppercase", config.color)}>{role}</span>
             </div>
-            <Button
-              variant="outline"
-              className="w-full justify-start"
-              size="sm"
-              onClick={() => signOut({ callbackUrl: "/login" })}
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              Sign Out
-            </Button>
+            <div className="flex flex-col gap-2 mt-4">
+              <ProfileDialog session={session}>
+                <Button variant="outline" className="w-full justify-start" size="sm">
+                  <User className="mr-2 h-4 w-4" />
+                  Edit Profile
+                </Button>
+              </ProfileDialog>
+              <Button
+                variant="outline"
+                className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
+                size="sm"
+                onClick={() => signOut({ callbackUrl: "/login" })}
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Sign Out
+              </Button>
+            </div>
           </div>
         </div>
       </aside>
