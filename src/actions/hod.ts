@@ -29,9 +29,20 @@ export async function createEvent(formData: FormData) {
   const category = formData.get("category") as string;
   const capacity = parseInt(formData.get("capacity") as string);
   const bannerUrl = formData.get("bannerUrl") as string;
+  const eventUrlRaw = formData.get("eventUrl") as string;
+  const eventUrl = eventUrlRaw?.trim();
 
   if (!title || !description || !date || !venue || !category || !capacity) {
     return { error: "All fields are required" };
+  }
+
+  if (eventUrl) {
+    try {
+      // Validate URL only when user provides it. This field is optional.
+      new URL(eventUrl);
+    } catch {
+      return { error: "Please enter a valid event website URL" };
+    }
   }
 
   try {
@@ -45,6 +56,7 @@ export async function createEvent(formData: FormData) {
       date: new Date(date),
       venue,
       category,
+      eventUrl: eventUrl || undefined,
       status: "pending",
       hodRecommendation: "pending",
       bannerUrl: bannerUrl || undefined,

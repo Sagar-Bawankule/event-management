@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { LogIn, Mail, Lock, Sparkles } from "lucide-react";
+import { LogIn, Mail, Lock, Sparkles, ArrowLeft } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,7 +29,15 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-violet-50 via-white to-purple-50 p-4">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-violet-50 via-white to-purple-50 p-4">
+      <button
+        onClick={() => router.push("/")}
+        className="self-start mb-4 p-2 rounded-lg hover:bg-violet-100 transition-colors"
+        title="Go back to home"
+      >
+        <ArrowLeft className="h-5 w-5 text-violet-600" />
+      </button>
+      <div className="flex-1 flex items-center justify-center">
       <motion.div
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
@@ -115,6 +123,7 @@ export default function LoginPage() {
           HODs and Admins are provisioned internally.
         </p>
       </motion.div>
+      </div>
     </div>
   );
 }

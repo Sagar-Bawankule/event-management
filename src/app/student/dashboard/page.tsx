@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getRecommendedEvents, getApprovedEvents, getMyRegistrations, getInterestedEvents, getProfile } from "@/actions/student";
+import { getContactInfo } from "@/actions/contact";
 import StudentDashboardClient from "./StudentDashboardClient";
 
 export default async function StudentDashboard() {
@@ -10,12 +11,13 @@ export default async function StudentDashboard() {
     redirect("/login");
   }
 
-  const [recommended, allEvents, myRegistrations, interestedEvents, profile] = await Promise.all([
+  const [recommended, allEvents, myRegistrations, interestedEvents, profile, contactInfo] = await Promise.all([
     getRecommendedEvents(),
     getApprovedEvents(),
     getMyRegistrations(),
     getInterestedEvents(),
     getProfile(),
+    getContactInfo(),
   ]);
 
   return (
@@ -27,6 +29,7 @@ export default async function StudentDashboard() {
         myRegistrations={myRegistrations}
         interestedEvents={interestedEvents}
         profile={profile}
+        contactInfo={contactInfo}
       />
     </Suspense>
   );

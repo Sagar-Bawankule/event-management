@@ -5,24 +5,23 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   Ban,
   BarChart3,
-  Building2,
   CalendarCheck,
   CalendarX,
   CheckCircle2,
-  Clock,
   Download,
-  GraduationCap,
+  Mail,
+  MapPin,
+  Phone,
   ShieldCheck,
   Trash2,
   UserPlus,
   Users,
-  XCircle,
 } from "lucide-react";
 import { Session } from "next-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -33,6 +32,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
@@ -50,6 +50,7 @@ import {
   rejectEvent,
   toggleUserBlock,
 } from "@/actions/admin";
+import { updateContactInfo } from "@/actions/contact";
 import { DEPARTMENTS, INTEREST_TAGS } from "@/lib/constants";
 import DashboardLayout from "@/components/DashboardLayout";
 import AdminAnalyticsCharts from "@/components/AdminAnalyticsCharts";
@@ -103,12 +104,20 @@ interface DashboardEvent {
   createdAt: string;
 }
 
+interface ContactDetails {
+  phone: string;
+  email: string;
+  address: string;
+  updatedAt?: string;
+}
+
 interface AdminDashboardClientProps {
   session: Session;
   stats: AdminStats;
   pendingEvents: DashboardEvent[];
   users: DashboardUser[];
   allEvents: DashboardEvent[];
+  contactInfo: ContactDetails;
 }
 
 function statusVariant(status: string): "success" | "warning" | "destructive" {
@@ -173,6 +182,7 @@ export default function AdminDashboardClient({
   pendingEvents,
   users,
   allEvents,
+  contactInfo,
 }: AdminDashboardClientProps) {
   const { toast } = useToast();
   const router = useRouter();
@@ -184,6 +194,11 @@ export default function AdminDashboardClient({
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [userSearch, setUserSearch] = useState("");
   const [eventSearch, setEventSearch] = useState("");
+  const [contactPhone, setContactPhone] = useState(contactInfo.phone);
+  const [contactEmail, setContactEmail] = useState(contactInfo.email);
+  const [contactAddress, setContactAddress] = useState(contactInfo.address);
+  const [contactUpdatedAt, setContactUpdatedAt] = useState(contactInfo.updatedAt);
+  const [contactSaving, setContactSaving] = useState(false);
 
   const filteredUsers = useMemo(() => {
     const normalized = userSearch.trim().toLowerCase();
@@ -322,6 +337,35 @@ export default function AdminDashboardClient({
     toast({
       title: shouldBlock ? "User blocked" : "User unblocked",
       description: `${user.name} is now ${shouldBlock ? "blocked" : "active"}`,
+      variant: "success",
+    });
+    router.refresh();
+  }
+
+  async function handleSaveContactInfo() {
+    setContactSaving(true);
+    const result = await updateContactInfo({
+      phone: contactPhone,
+      email: contactEmail,
+      address: contactAddress,
+    });
+    setContactSaving(false);
+
+    if (result.error) {
+      toast({ title: "Error", description: result.error, variant: "destructive" });
+      return;
+    }
+
+    if (result.contact) {
+      setContactPhone(result.contact.phone);
+      setContactEmail(result.contact.email);
+      setContactAddress(result.contact.address);
+      setContactUpdatedAt(result.contact.updatedAt);
+    }
+
+    toast({
+      title: "Contact details updated",
+      description: "Student helpline information has been saved.",
       variant: "success",
     });
     router.refresh();
@@ -751,6 +795,65 @@ export default function AdminDashboardClient({
                     </table>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="contact" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Student Helpline Contact Management</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="contact-phone" className="flex items-center gap-2">
+                      <Phone className="h-4 w-4" /> Mobile Number
+                    </Label>
+                    <Input
+                      id="contact-phone"
+                      value={contactPhone}
+                      onChange={(event) => setContactPhone(event.target.value)}
+                      placeholder="+91 98765 43210"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="contact-email" className="flex items-center gap-2">
+                      <Mail className="h-4 w-4" /> Contact Email
+                    </Label>
+                    <Input
+                      id="contact-email"
+                      type="email"
+                      value={contactEmail}
+                      onChange={(event) => setContactEmail(event.target.value)}
+                      placeholder="events@college.com"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="contact-address" className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4" /> Office Address
+                  </Label>
+                  <Textarea
+                    id="contact-address"
+                    value={contactAddress}
+                    onChange={(event) => setContactAddress(event.target.value)}
+                    rows={4}
+                    placeholder="Admin Office, Main Block, Campus Road"
+                  />
+                </div>
+
+                {contactUpdatedAt && (
+                  <p className="text-xs text-muted-foreground">
+                    Last saved at: {new Date(contactUpdatedAt).toLocaleString("en-IN")}
+                  </p>
+                )}
+
+                <Button onClick={handleSaveContactInfo} disabled={contactSaving}>
+                  {contactSaving ? "Saving..." : "Save Contact Details"}
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>

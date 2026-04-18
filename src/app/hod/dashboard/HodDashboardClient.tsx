@@ -3,7 +3,6 @@
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  BarChart3,
   Building2,
   CalendarPlus,
   CheckCircle2,
@@ -34,7 +33,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/toaster";
 import {
   approveDepartmentEvent,
@@ -51,6 +50,7 @@ interface HodEvent {
   date: string;
   venue: string;
   category: string;
+  eventUrl?: string;
   status: "pending" | "approved" | "rejected";
   hodRecommendation?: "pending" | "recommended" | "not_recommended";
   department?: string;
@@ -223,7 +223,7 @@ export default function HodDashboardClient({
                 <CalendarPlus className="mr-2 h-5 w-5" /> Create Department Event
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg">
+            <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Create Department-Specific Event</DialogTitle>
                 <DialogDescription>
@@ -282,6 +282,16 @@ export default function HodDashboardClient({
                 <div className="space-y-2">
                   <Label htmlFor="bannerUrl">Banner URL (optional)</Label>
                   <Input id="bannerUrl" name="bannerUrl" placeholder="https://..." />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="eventUrl">Event Website URL (optional)</Label>
+                  <Input
+                    id="eventUrl"
+                    name="eventUrl"
+                    type="url"
+                    placeholder="https://hackathon.example.com"
+                  />
                 </div>
 
                 <Button type="submit" className="w-full" disabled={loading}>

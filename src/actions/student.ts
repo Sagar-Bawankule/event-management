@@ -58,17 +58,24 @@ export async function getRecommendedEvents() {
       .lean();
 
     const interestTokens = new Set((user.interests || []).flatMap((interest: string) => tokenize(interest)));
+    const userInterestsLower = (user.interests || []).map((i: string) => i.toLowerCase());
 
     const ranked = events
       .map((event) => {
         const reasons: string[] = [];
         let score = 0;
+        const normalizedCategory = (event.category || "").toLowerCase().trim();
+        const isInterestMatch = userInterestsLower.some((interest) =>
+          normalizedCategory === interest ||
+          normalizedCategory.includes(interest) ||
+          interest.includes(normalizedCategory)
+        );
 
         if (includesUserId(event.registeredStudents, session.user.id)) {
           return null;
         }
 
-        if (user.interests?.includes(event.category)) {
+        if (isInterestMatch) {
           score += 45;
           reasons.push("Matches your interests");
         }
@@ -114,10 +121,21 @@ export async function getRecommendedEvents() {
         };
       })
       .filter((event): event is NonNullable<typeof event> => Boolean(event))
-      .sort((a, b) => b.aiScore - a.aiScore || new Date(a.date).getTime() - new Date(b.date).getTime())
-      .slice(0, 8);
+      .sort((a, b) => b.aiScore - a.aiScore || new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    return JSON.parse(JSON.stringify(ranked));
+    // Strict filtering: for users with selected interests, only return matching categories.
+    const interestMatched = ranked.filter((event) => {
+      const normalizedCategory = (event.category || "").toLowerCase().trim();
+      return userInterestsLower.some((interest) =>
+        normalizedCategory === interest ||
+        normalizedCategory.includes(interest) ||
+        interest.includes(normalizedCategory)
+      );
+    });
+
+    const toReturn = userInterestsLower.length > 0 ? interestMatched : ranked;
+
+    return JSON.parse(JSON.stringify(toReturn.slice(0, 8)));
   } catch (error) {
     console.error("Get recommended events error:", error);
     return [];

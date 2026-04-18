@@ -6,7 +6,6 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { Session } from "next-auth";
 import {
-  LayoutDashboard,
   LogOut,
   Menu,
   X,
@@ -23,6 +22,7 @@ import {
   Search,
   Heart,
   Ticket,
+  PhoneCall,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -46,6 +46,7 @@ const roleConfig = {
       { href: "/admin/dashboard?tab=analytics", label: "Analytics", icon: BarChart3 },
       { href: "/admin/dashboard?tab=users", label: "Users", icon: Users },
       { href: "/admin/dashboard?tab=events", label: "Events", icon: CalendarCheck },
+      { href: "/admin/dashboard?tab=contact", label: "Contact", icon: PhoneCall },
       { href: "/admin/dashboard?tab=reports", label: "Reports", icon: Download },
     ],
   },
@@ -69,6 +70,7 @@ const roleConfig = {
       { href: "/student/dashboard?tab=explore", label: "Explore", icon: Search },
       { href: "/student/dashboard?tab=interested", label: "Interested", icon: Heart },
       { href: "/student/dashboard?tab=registered", label: "Registered", icon: Ticket },
+      { href: "/student/dashboard?tab=contact", label: "Contact", icon: PhoneCall },
     ],
   },
 };

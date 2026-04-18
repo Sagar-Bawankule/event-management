@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Bot, X, Send, Minimize2, Sparkles, ChevronDown } from "lucide-react";
+import { Bot, X, Send, Minimize2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -19,9 +19,31 @@ const WELCOME_MESSAGE: Message = {
   timestamp: new Date(),
 };
 
+function escapeHtml(input: string) {
+  return input
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function resolveErrorMessage(status: number, serverMessage?: string) {
+  if (serverMessage && serverMessage.trim().length > 0) {
+    return serverMessage;
+  }
+
+  if (status === 401) return "Please login as a student to use MeetBot.";
+  if (status === 429) return "MeetBot is busy right now. Please retry in a few seconds.";
+  if (status >= 500) return "MeetBot is temporarily unavailable. Please try again shortly.";
+
+  return "Something went wrong. Please try again.";
+}
+
 function formatText(text: string) {
+  const safeText = escapeHtml(text);
   // Bold text
-  let formatted = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+  let formatted = safeText.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
   // Bullet points
   formatted = formatted.replace(/^- (.+)$/gm, "• $1");
   // Line breaks
@@ -86,15 +108,20 @@ export default function StudentChatbot() {
         body: JSON.stringify({ message: text, history }),
       });
 
-      const data = await res.json();
+      let data: { reply?: string; error?: string } = {};
+      try {
+        data = await res.json();
+      } catch {
+        data = {};
+      }
 
       if (!res.ok || data.error) {
-        setError(data.error || "Something went wrong. Please try again.");
+        setError(resolveErrorMessage(res.status, data.error));
       } else {
         const botMsg: Message = {
           id: crypto.randomUUID(),
           role: "model",
-          text: data.reply,
+          text: data.reply || "I couldn't create a response this time. Please ask again.",
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, botMsg]);
@@ -257,7 +284,11 @@ export default function StudentChatbot() {
           {/* Suggested prompts */}
           {messages.length === 1 && (
             <div className="px-4 pb-2 flex gap-2 overflow-x-auto scrollbar-none">
-              {["Show coding events", "What's happening this week?", "Any cultural events?"].map((prompt) => (
+              {[
+                "Show coding events",
+                "What's happening this week?",
+                "Tell me about \"Hackathon\"",
+              ].map((prompt) => (
                 <button
                   key={prompt}
                   onClick={() => {

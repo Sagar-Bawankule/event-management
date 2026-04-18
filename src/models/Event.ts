@@ -9,6 +9,7 @@ export interface IEvent extends Document {
   date: Date;
   venue: string;
   category: string;
+  eventUrl?: string;
   status: "pending" | "approved" | "rejected";
   hodRecommendation: "pending" | "recommended" | "not_recommended";
   hodReviewedAt?: Date;
@@ -29,6 +30,7 @@ const EventSchema = new Schema<IEvent>(
     date: { type: Date, required: true },
     venue: { type: String, required: true },
     category: { type: String, required: true },
+    eventUrl: { type: String },
     status: {
       type: String,
       enum: ["pending", "approved", "rejected"],

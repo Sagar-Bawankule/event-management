@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getAdminStats, getPendingEvents, getAllUsers, getAllEvents } from "@/actions/admin";
+import { getContactInfo } from "@/actions/contact";
 import AdminDashboardClient from "./AdminDashboardClient";
 
 export default async function AdminDashboard() {
@@ -10,11 +11,12 @@ export default async function AdminDashboard() {
     redirect("/");
   }
 
-  const [stats, pendingEvents, users, allEvents] = await Promise.all([
+  const [stats, pendingEvents, users, allEvents, contactInfo] = await Promise.all([
     getAdminStats(),
     getPendingEvents(),
     getAllUsers("all"),
     getAllEvents(),
+    getContactInfo(),
   ]);
 
   return (
@@ -25,6 +27,7 @@ export default async function AdminDashboard() {
         pendingEvents={pendingEvents}
         users={users}
         allEvents={allEvents}
+        contactInfo={contactInfo}
       />
     </Suspense>
   );
