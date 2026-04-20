@@ -29,6 +29,16 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
+        hostname: "1x.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "www.1x.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
         hostname: "**.mm.bing.net",
         pathname: "/**",
       },

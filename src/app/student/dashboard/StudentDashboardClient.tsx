@@ -8,6 +8,7 @@ import {
   Brain,
   Calendar,
   Compass,
+  ExternalLink,
   Heart,
   Mail,
   MapPin,
@@ -61,6 +62,7 @@ interface DashboardEvent {
   date: string;
   venue: string;
   category: string;
+  eventUrl?: string;
   status: string;
   department?: string;
   bannerUrl?: string;
@@ -244,6 +246,19 @@ function formatDateLabel(dateValue: string) {
     month: "short",
     year: "numeric",
   });
+}
+
+function getSafeEventUrl(url?: string) {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+      return parsed.toString();
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 export default function StudentDashboardClient({
@@ -448,6 +463,7 @@ export default function StudentDashboardClient({
     const isFull = registrations >= event.capacity;
     const isPast = isPastEvent(event.date);
     const theme = getCategoryTheme(event.category);
+    const safeEventUrl = getSafeEventUrl(event.eventUrl);
 
     return (
       <Card
@@ -519,6 +535,21 @@ export default function StudentDashboardClient({
               {event.organizer?.name || "Organizer"}
               {event.organizer?.department ? ` (${event.organizer.department})` : ""}
             </div>
+            {safeEventUrl && (
+              <div className="flex items-center gap-2 text-sm text-slate-600">
+                <ExternalLink className="h-4 w-4 text-sky-600" />
+                <a
+                  href={safeEventUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(clickEvent) => clickEvent.stopPropagation()}
+                  className="truncate text-sky-700 underline-offset-2 hover:underline"
+                  title={safeEventUrl}
+                >
+                  Event link
+                </a>
+              </div>
+            )}
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3">
@@ -594,6 +625,7 @@ export default function StudentDashboardClient({
   const selectedEventAvailableSeats = selectedEvent
     ? Math.max(selectedEvent.capacity - selectedEventRegistrations, 0)
     : 0;
+  const selectedEventSafeUrl = getSafeEventUrl(selectedEvent?.eventUrl);
 
   return (
     <DashboardLayout session={session} role="student">
@@ -946,7 +978,7 @@ export default function StudentDashboardClient({
                   Event Helpline & Contact Details
                 </CardTitle>
                 <p className="text-sm text-slate-600">
-                  Event registration, cancellation, or support साठी खालील details वर संपर्क करा.
+                  For event registration, cancellation, or support, please contact using the details below.
                 </p>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -1044,6 +1076,21 @@ export default function StudentDashboardClient({
                       <p className="text-xs font-semibold uppercase text-slate-500">Status</p>
                       <p className="mt-1 font-medium">{isPastEvent(selectedEvent.date) ? "Closed" : "Open for registration"}</p>
                     </div>
+                    {selectedEventSafeUrl && (
+                      <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-sm text-slate-700 sm:col-span-2">
+                        <p className="text-xs font-semibold uppercase text-slate-500">Event Link</p>
+                        <a
+                          href={selectedEventSafeUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-1 inline-flex items-center gap-2 font-medium text-sky-700 underline-offset-2 hover:underline"
+                          title={selectedEventSafeUrl}
+                        >
+                          Open event website
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      </div>
+                    )}
                   </div>
 
                   {selectedEvent.aiReason && (
